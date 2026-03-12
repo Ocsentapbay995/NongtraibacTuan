@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Nông Trại Bác Tuấn - Level Up</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <style>
+        :root { --primary: #ffeb3b; --secondary: #4caf50; --danger: #f44336; }
+        
+        body { 
+            margin: 0; padding: 0; min-height: 100vh;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: #aed581 url('garden.jpg') no-repeat center center fixed;
+            background-size: cover; font-family: 'Segoe UI', Tahoma, sans-serif;
+            overflow: hidden;
+        }
+
+        /* --- MÀN HÌNH GIỚI THIỆU BÁC TUẤN --- */
+        #intro-screen {
+            position: fixed; inset: 0; background: rgba(255, 255, 255, 0.9);
+            display: flex; align-items: flex-end; z-index: 2000;
+            transition: opacity 1s;
+        }
+
+        .farmer-container {
+            position: absolute; left: 50px; bottom: 0;
+            display: flex; align-items: flex-end;
+        }
+
+        #farmer-intro-img { 
+            height: 500px; /* Bác Tuấn chiếm diện tích lớn */
+            transform-origin: bottom center;
+            animation: waving 3s ease-in-out infinite;
+        }
+
+        /* Hiệu ứng vẫy tay/nghiêng người thân thiện */
+        @keyframes waving {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(2deg) scale(1.02); }
+            75% { transform: rotate(-2deg); }
+        }
+
+        #speech-bubble {
+            background: white; border: 8px solid #2e7d32;
+            border-radius: 40px; padding: 40px;
+            width: 500px; min-height: 150px;
+            position: absolute; left: 450px; bottom: 250px;
+            box-shadow: 20px 20px 0 rgba(46, 125, 50, 0.1);
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        /* Hiệu ứng chạy từ mượt */
+        .word-span { 
+            display: inline-block; margin-right: 10px; opacity: 0; 
+            transform: translateY(10px); transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            font-size: 28px; font-weight: bold; color: #2e7d32;
+        }
+        .word-span.visible { opacity: 1; transform: translateY(0); }
+
+        /* --- CÁC PHẦN CÒN LẠI GIỮ NGUYÊN VÀ TỐI ƯU --- */
+        #level-select {
+            display: none; background: rgba(255,255,255,0.95);
+            padding: 50px; border-radius: 40px; text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3); z-index: 1000;
+        }
+        .level-btn {
+            padding: 15px 45px; margin: 15px; cursor: pointer; border: none;
+            border-radius: 50px; font-weight: bold; font-size: 22px; color: white;
+            transition: 0.3s;
+        }
+        .easy { background: #8bc34a; } .medium { background: #ff9800; } .hard { background: #f44336; }
+        .level-btn:hover { transform: scale(1.1); }
+
+        #ui-top {
+            position: fixed; top: 0; width: 100%; padding: 20px;
+            display: none; justify-content: space-around; z-index: 100;
+        }
+        .info-card { background: white; padding: 10px 30px; border-radius: 50px; font-weight: bold; font-size: 24px; }
+
+        #game-board {
+            display: none; gap: 20px; padding: 150px 20px 250px 20px;
+            width: 100%; max-width: 1200px; justify-content: center;
+        }
+        .grid-1 { grid-template-columns: minmax(350px, 500px); }
+        .grid-3 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+        .grid-9 { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+
+        .pot-wrapper {
+            background: rgba(255, 255, 255, 0.9); border-radius: 30px; padding: 25px;
+            display: flex; flex-direction: column; align-items: center; border: 6px solid transparent;
+            transition: 0.3s;
+        }
+        .active-pot { border-color: var(--primary); transform: scale(1.05); box-shadow: 0 0 30px var(--primary); }
+        .ready-harvest { border-color: #f57c00; animation: pulse 1.5s infinite; }
+
+        #farmer-action { display: none; position: absolute; height: 140px; z-index: 50; transition: 0.6s; }
+        .jump { animation: jumpAnim 0.6s ease; }
+        @keyframes jumpAnim { 50% { transform: translateY(-50px) scale(1.1); } }
+
+        #math-input-area {
+            position: fixed; bottom: 0; width: 100%; background: white; padding: 30px;
+            display: none; justify-content: center; align-items: center; gap: 30px;
+        }
+        input { font-size: 40px; width: 150px; text-align: center; border: 6px solid var(--secondary); border-radius: 20px; }
+    </style>
+</head>
+<body>
+
+<div id="intro-screen">
+    <div class="farmer-container">
+        <img id="farmer-intro-img" src="farmer.png" alt="Bác Tuấn">
+        <div id="speech-bubble">
+            <div id="intro-text"></div>
+        </div>
+    </div>
+</div>
+
+<div id="level-select">
+    <h1 style="color:#2e7d32; font-size: 40px;">🌻 NÔNG TRẠI BÁC TUẤN 👨‍🌾</h1>
+    <p>Các cháu hãy giúp bác chăm sóc khu vườn nhé!</p>
+    <button class="level-btn easy" onclick="initGame(1)">1 CHẬU (DỄ)</button>
+    <button class="level-btn medium" onclick="initGame(3)">3 CHẬU (VỪA)</button>
+    <button class="level-btn hard" onclick="initGame(9)">9 CHẬU (KHÓ)</button>
+</div>
+
+<div id="ui-top">
+    <div class="info-card">⏳ <span id="sec">10</span>s</div>
+    <div class="info-card">📦 KHO HOA: <span id="harvest-count">0</span></div>
+</div>
+
+<img id="farmer-action" src="farmer.png">
+<div id="game-board"></div>
+
+<div id="math-input-area">
+    <span id="question" style="font-size: 45px; font-weight: bold;"></span> = 
+    <input type="number" id="answer" autofocus>
+</div>
+
+<script>
+    const introLines = [
+        "Chào các cháu thân yêu đã đến với Khu vườn của bác Tuấn!",
+        "Hãy chăm sóc các chậu hoa thật tốt để kho của bác thật nhiều hoa nhé!",
+        "Trả lời đúng các câu hỏi để hoa nhanh lớn nhé! Chúc các cháu thành công!"
+    ];
+
+    let lineIdx = 0;
+    const wordInterval = 250;
+    const lineWaitTime = 4000;
+
+    function startIntro() {
+        if (lineIdx < introLines.length) {
+            const introBox = document.getElementById('intro-text');
+            introBox.innerHTML = "";
+            const words = introLines[lineIdx].split(" ");
+
+            words.forEach((word, i) => {
+                const span = document.createElement("span");
+                span.className = "word-span";
+                span.innerText = word;
+                introBox.appendChild(span);
+                setTimeout(() => span.classList.add('visible'), i * wordInterval);
+            });
+
+            setTimeout(() => {
+                lineIdx++;
+                startIntro();
+            }, (words.length * wordInterval) + lineWaitTime);
+        } else {
+            document.getElementById('intro-screen').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('intro-screen').style.display = 'none';
+                document.getElementById('level-select').style.display = 'block';
+            }, 1000);
+        }
+    }
+
+    window.onload = startIntro;
+
+    // --- LOGIC GAME CƠ BẢN ---
+    let potsData = [], currentIdx = 0, timer, harvested = 0, isHarvesting = false, queue = [];
+
+    function initGame(num) {
+        document.getElementById('level-select').style.display = 'none';
+        document.getElementById('ui-top').style.display = 'flex';
+        document.getElementById('game-board').style.display = 'grid';
+        document.getElementById('math-input-area').style.display = 'flex';
+        
+        const board = document.getElementById('game-board');
+        board.className = `grid-${num}`;
+        board.innerHTML = '';
+        
+        for (let i = 0; i < num; i++) {
+            potsData.push({ h: 0, mistakes: 0, status: 'alive' });
+            const pot = document.createElement('div');
+            pot.className = 'pot-wrapper';
+            pot.id = `pot-${i}`;
+            pot.innerHTML = `<img src="sprout.png" id="img-${i}" style="height:150px; object-fit:contain"><div style="font-weight:bold; margin-top:10px">Cao: <span id="h-${i}">0</span>/30cm</div><div id="lives-${i}">❤️❤️❤️</div>`;
+            board.appendChild(pot);
+        }
+        newRound();
+    }
+
+    function newRound() {
+        if (queue.length > 0 && !isHarvesting) { doHarvest(); return; }
+        const alive = potsData.map((p, i) => (p.status === 'alive' && p.h < 30) ? i : null).filter(v => v !== null);
+        if (alive.length === 0 && queue.length === 0) { alert("Xong rồi! Hoa thu được: " + harvested); location.reload(); return; }
+        if (alive.length === 0) return;
+
+        document.querySelectorAll('.pot-wrapper').forEach(p => p.classList.remove('active-pot'));
+        currentIdx = alive[Math.floor(Math.random() * alive.length)];
+        document.getElementById(`pot-${currentIdx}`).classList.add('active-pot');
+        
+        let a = Math.floor(Math.random() * 10) + 1, b = Math.floor(Math.random() * 10) + 1;
+        window.ans = a + b;
+        document.getElementById('question').innerText = `${a} + ${b}`;
+        document.getElementById('answer').value = '';
+        document.getElementById('answer').focus();
+        
+        let t = 10; document.getElementById('sec').innerText = t;
+        clearInterval(timer);
+        timer = setInterval(() => {
+            t--; document.getElementById('sec').innerText = t;
+            if (t <= 0) handleWrong();
+        }, 1000);
+    }
+
+    document.getElementById('answer').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            if (parseInt(e.target.value) === window.ans) {
+                potsData[currentIdx].h += 10;
+                if (potsData[currentIdx].h >= 30) {
+                    queue.push(currentIdx);
+                    document.getElementById(`pot-${currentIdx}`).classList.add('ready-harvest');
+                }
+                updatePot(currentIdx);
+                newRound();
+            } else handleWrong();
+        }
+    });
+
+    function handleWrong() {
+        potsData[currentIdx].mistakes++;
+        if (potsData[currentIdx].mistakes >= 3) {
+            potsData[currentIdx].status = 'dead';
+            document.getElementById(`pot-${currentIdx}`).style.opacity = '0.5';
+        }
+        updatePot(currentIdx);
+        newRound();
+    }
+
+    function updatePot(i) {
+        const p = potsData[i];
+        document.getElementById(`h-${i}`).innerText = p.h;
+        document.getElementById(`lives-${i}`).innerText = p.status === 'dead' ? "💀" : "❤️".repeat(3-p.mistakes);
+        const img = document.getElementById(`img-${i}`);
+        if (p.status === 'dead') img.src = "dead.png";
+        else if (p.h >= 30) img.src = "sunflower.png";
+        else if (p.h >= 15) img.src = "plant.png";
+    }
+
+    function doHarvest() {
+        isHarvesting = true;
+        const id = queue.shift();
+        const f = document.getElementById('farmer-action');
+        const rect = document.getElementById(`pot-${id}`).getBoundingClientRect();
+        f.style.display = 'block';
+        f.style.left = (rect.left + rect.width/2 - 70) + "px";
+        f.style.top = (rect.top - 120) + "px";
+        setTimeout(() => {
+            f.classList.add('jump');
+            setTimeout(() => {
+                harvested++; document.getElementById('harvest-count').innerText = harvested;
+                confetti({ origin: { x: (rect.left + rect.width/2)/window.innerWidth, y: rect.top/window.innerHeight } });
+                potsData[id].h = 0;
+                document.getElementById(`pot-${id}`).classList.remove('ready-harvest');
+                updatePot(id);
+                f.classList.remove('jump'); f.style.display = 'none';
+                isHarvesting = false; newRound();
+            }, 600);
+        }, 600);
+    }
+</script>
+</body>
+</html>
